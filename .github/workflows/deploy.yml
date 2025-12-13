@@ -1,25 +1,15 @@
-name: Deploy Node Server via SSM
+name: Node Backend Deploy
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
       - name: SSH로 EC2에 접속하여 Node Backend 배포
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -29,13 +19,14 @@ jobs:
           script_stop: true
           script: |
             set -e
+            export PATH=$PATH:/usr/bin:/usr/local/bin
 
             cd /home/ubuntu/app/Back-End
 
             git pull origin main
 
-            npm install
+            npm ci
 
             pkill -f "node .*src/index.js" || true
 
-            nohup npm start src/index.js > output.log 2>&1 &
+            nohup npm start > output.log 2>&1 &
