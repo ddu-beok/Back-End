@@ -16,7 +16,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_PRIVATE_KEY }}
-          script_stop: true
+          script_stop: false
           script: |
             set -e
             export PATH=$PATH:/usr/bin:/usr/local/bin
