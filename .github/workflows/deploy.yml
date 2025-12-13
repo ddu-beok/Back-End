@@ -27,8 +27,6 @@ jobs:
 
             git pull origin main
 
-            npm ci
+            chmod +x /home/ubuntu/deploy.sh
 
-            pkill -f "node .*src/index.js" || true
-
-            nohup npm start src/index.js > output.log 2>&1 &
+            /home/ubuntu/deploy.sh
