@@ -27,11 +27,15 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --comment "Deploy Node Backend" \
             --parameters commands="[
-              \"cd /home/ssm-user/app/Back-End\",
+              \"cd /home/ssm-user/app/Back-End || exit 1\",
+              \"pwd\",
+              \"git branch\",
+              \"git pull origin main\",
+              \"git log -1 --oneline\",
               \"cat << 'EOF' > .env\",
               \"${{ secrets.ENV }}\",
               \"EOF\",
-              \"git pull origin main\",
               \"npm install\",
-              \"pm2 restart backend --update-env || pm2 start src/index.js --name backend\"
+              \"pm2 restart backend --update-env || pm2 start src/index.js --name backend\",
+              \"pm2 save\"
             ]"
