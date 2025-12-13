@@ -27,17 +27,12 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --comment "Deploy Node Backend" \
             --parameters commands="[
-              \"cd /home/ssm-user/app/Back-End || exit 1\",
-              \"pwd\",
-              \"git rev-parse --abbrev-ref HEAD\",
-              \"git fetch origin\",
-              \"git reset --hard origin/main\",
-              \"git log -1 --oneline\",
-              \"cat << 'EOF' > .env\",
-              \"${{ secrets.ENV }}\",
-              \"EOF\",
-              \"npm install\",
-              \"pm2 delete backend || true\",
-              \"pm2 start src/index.js --name backend --cwd /home/ssm-user/app/Back-End\",
-              \"pm2 save\"
+              \"sudo -u ssm-user bash -lc 'cd /home/ssm-user/app/Back-End || exit 1'\",
+              \"sudo -u ssm-user bash -lc 'git fetch origin'\",
+              \"sudo -u ssm-user bash -lc 'git reset --hard origin/main'\",
+              \"sudo -u ssm-user bash -lc 'git log -1 --oneline'\",
+              \"sudo -u ssm-user bash -lc 'npm install'\",
+              \"sudo -u ssm-user bash -lc 'pm2 delete backend || true'\",
+              \"sudo -u ssm-user bash -lc 'pm2 start src/index.js --name backend --cwd /home/ssm-user/app/Back-End'\",
+              \"sudo -u ssm-user bash -lc 'pm2 save'\"
             ]"
