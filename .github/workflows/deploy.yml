@@ -20,19 +20,22 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Deploy to EC2 using SSM
-        run: |
-          aws ssm send-command \
-            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
-            --document-name "AWS-RunShellScript" \
-            --comment "Deploy Node Backend" \
-            --parameters commands="[
-              \"sudo -u ssm-user bash -lc 'cd /home/ssm-user/app/Back-End || exit 1'\",
-              \"sudo -u ssm-user bash -lc 'git fetch origin'\",
-              \"sudo -u ssm-user bash -lc 'git reset --hard origin/main'\",
-              \"sudo -u ssm-user bash -lc 'git log -1 --oneline'\",
-              \"sudo -u ssm-user bash -lc 'npm install'\",
-              \"sudo -u ssm-user bash -lc 'pm2 delete backend || true'\",
-              \"sudo -u ssm-user bash -lc 'pm2 start src/index.js --name backend --cwd /home/ssm-user/app/Back-End'\",
-              \"sudo -u ssm-user bash -lc 'pm2 save'\"
-            ]"
+      - name: SSH로 EC2에 접속하여 Node Backend 배포
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            set -e
+
+            cd /home/ubuntu/app/Back-End
+
+            git pull origin main
+
+            npm install
+
+            pkill -f "node .*src/index.js" || true
+
+            nohup npm start src/index.js > output.log 2>&1 &
