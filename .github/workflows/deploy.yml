@@ -33,6 +33,5 @@ jobs:
               \"EOF\",
               \"git pull origin main\",
               \"npm install\",
-              \"pm2 stop backend || true\",
-              \"pm2 start src/index.js --name backend\"
+              \"pm2 restart backend --update-env || pm2 start src/index.js --name backend\"
             ]"
