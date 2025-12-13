@@ -1,8 +1,9 @@
-name: Deploy to EC2 via SSM
+name: Deploy to EC2
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   deploy:
@@ -12,23 +13,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Deploy using SSM
-        run: |
-          aws ssm send-command \
-            --instance-ids "i-0019e302a387d0b62" \
-            --document-name "AWS-RunShellScript" \
-            --comment "GitHub Actions Deploy" \
-            --parameters commands="[
-              \"set -e\",
-              \"cd /home/ssm-user/app/Back-End\",
-              \"git fetch origin main\",
-              \"git reset --hard origin/main\",
-              \"git log -1\"
-            ]"
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ssm-user/app/Back-End
+            ./deploy.sh
