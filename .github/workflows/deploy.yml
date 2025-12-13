@@ -28,6 +28,7 @@ jobs:
             --comment "Deploy Node Backend" \
             --parameters commands="[
               \"cd /home/ssm-user/app/Back-End\",
+              \"echo '${{ secrets.ENV }}' > .env\",
               \"git pull origin main\",
               \"npm install\",
               \"pm2 stop backend || true\",
