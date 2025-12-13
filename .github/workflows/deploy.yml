@@ -1,47 +1,35 @@
-name: Deploy Node Server
+name: Deploy Node Server via SSM
 
 on:
-  pull_request:
-    types: [closed]
-    branches:
-      - main
-
   push:
-    branches:
-      - main
-
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'pull_request' &&
-       github.event.pull_request.merged == true)
-
     steps:
-      - name: Github Repository 파일 불러오기
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          node-version: 18
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: SSH into EC2 and deploy Node app
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}   
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script_stop: true
-          script: |
-            cd /home/ssm-user/app/Back-End
-            git pull origin main
-            npm install
-            nohup npm start > app.log 2>&1 &
+      - name: Deploy to EC2 using SSM
+        run: |
+          aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy Node Backend" \
+            --parameters commands="[
+              \"cd /home/ssm-user/app/Back-End\",
+              \"git pull origin main\",
+              \"npm install\",
+              \"pm2 stop backend || true\",
+              \"pm2 start src/index.js --name backend\"
+            ]"
