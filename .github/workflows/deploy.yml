@@ -29,4 +29,4 @@ jobs:
 
             pkill -f "node .*src/index.js" || true
 
-            nohup npm start > output.log 2>&1 &
+            nohup npm start > output.log 2>&1 & disown
