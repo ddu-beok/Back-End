@@ -1,24 +1,47 @@
-name: Deploy to EC2
+name: Deploy Node Server
 
 on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
   push:
     branches:
       - main
+
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.merged == true)
+
     steps:
-      - name: Checkout code
+      - name: Github Repository 파일 불러오기
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: SSH into EC2 and deploy Node app
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          username: ${{ secrets.EC2_USERNAME }}   
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          script_stop: true
           script: |
             cd /home/ssm-user/app/Back-End
-            ./deploy.sh
+            git pull origin main
+            npm install
+            nohup npm start > app.log 2>&1 &
