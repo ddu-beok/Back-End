@@ -29,8 +29,9 @@ jobs:
             --parameters commands="[
               \"cd /home/ssm-user/app/Back-End || exit 1\",
               \"pwd\",
-              \"git branch\",
-              \"git pull origin main\",
+              \"git rev-parse --abbrev-ref HEAD\",
+              \"git fetch origin\",
+              \"git reset --hard origin/main\",
               \"git log -1 --oneline\",
               \"cat << 'EOF' > .env\",
               \"${{ secrets.ENV }}\",
