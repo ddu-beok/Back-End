@@ -36,6 +36,7 @@ jobs:
               \"${{ secrets.ENV }}\",
               \"EOF\",
               \"npm install\",
-              \"pm2 restart backend --update-env || pm2 start src/index.js --name backend\",
+              \"pm2 delete backend || true\",
+              \"pm2 start src/index.js --name backend --cwd /home/ssm-user/app/Back-End\",
               \"pm2 save\"
             ]"
