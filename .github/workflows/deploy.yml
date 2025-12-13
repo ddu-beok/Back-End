@@ -26,7 +26,9 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --comment "GitHub Actions Deploy" \
             --parameters commands="[
-              \"cd /home/ssm-user/app || exit\",
-              \"git pull\",
-              \"echo DEPLOY_OK\"
+              \"set -e\",
+              \"cd /home/ssm-user/app/Back-End\",
+              \"git fetch origin main\",
+              \"git reset --hard origin/main\",
+              \"git log -1\"
             ]"
