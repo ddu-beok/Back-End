@@ -16,12 +16,14 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_PRIVATE_KEY }}
-          script_stop: false
+          script_stop: true
           script: |
             set -e
             export PATH=$PATH:/usr/bin:/usr/local/bin
 
             cd /home/ubuntu/app/Back-End
+
+            echo '${{ secrets.ENV }}' > .env
 
             git pull origin main
 
@@ -29,4 +31,4 @@ jobs:
 
             pkill -f "node .*src/index.js" || true
 
-            nohup npm start > output.log 2>&1 & disown
+            nohup npm start src/index.js > output.log 2>&1 &
