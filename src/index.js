@@ -2,6 +2,7 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const express = require("express");
 const { initDB } = require("./db.config");
+const userRoutes = require('./routes/userRoutes');
 
 dotenv.config();
 
@@ -19,6 +20,8 @@ app.use(express.urlencoded({ extended: false }));
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
+
+app.use('/api/users', userRoutes);
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);

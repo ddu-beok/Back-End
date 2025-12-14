@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS ddu_beok (
     start_date DATETIME,
     end_date DATETIME,
     img VARCHAR(255),
-    participant JSON,
+    participant VARCHAR(255),
     latitude DOUBLE,
     longitude DOUBLE,
     is_favorite TINYINT(1) DEFAULT 0,
