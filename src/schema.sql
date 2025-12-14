@@ -1,0 +1,84 @@
+CREATE TABLE IF NOT EXISTS user (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    nickname VARCHAR(255),
+    profile_img VARCHAR(255),
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS ddu_beok (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    title VARCHAR(255),
+    location VARCHAR(255),
+    password VARCHAR(255),
+    start_date DATETIME,
+    end_date DATETIME,
+    img VARCHAR(255),
+    participant JSON,
+    latitude DOUBLE,
+    longitude DOUBLE,
+    is_favorite TINYINT(1) DEFAULT 0,
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (user_id) REFERENCES user(id)
+);
+
+CREATE TABLE IF NOT EXISTS schedule (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    ddu_beok_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    content VARCHAR(255),
+    start_time TIME,
+    end_time TIME,
+    loc_detail VARCHAR(255),
+    latitude DOUBLE,
+    longitude DOUBLE,
+    day_num INT,
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (ddu_beok_id) REFERENCES ddu_beok(id),
+    FOREIGN KEY (user_id) REFERENCES user(id)
+);
+
+CREATE TABLE IF NOT EXISTS todo (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    ddu_beok_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    category VARCHAR(255),
+    content VARCHAR(255),
+    is_checked TINYINT(1) DEFAULT 0,
+    day_num INT,
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (ddu_beok_id) REFERENCES ddu_beok(id),
+    FOREIGN KEY (user_id) REFERENCES user(id)
+);
+
+CREATE TABLE IF NOT EXISTS recommend (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    title VARCHAR(255),
+    img VARCHAR(255),
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id)
+);

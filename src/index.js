@@ -1,11 +1,15 @@
-import cors from "cors";
-import dotenv from "dotenv";
-import express from "express";
+const cors = require("cors");
+const dotenv = require("dotenv");
+const express = require("express");
+const { initDB } = require("./db.config");
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// DB 생성시 사용
+// initDB();
 
 app.use(cors());
 app.use(express.static("public"));

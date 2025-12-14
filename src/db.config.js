@@ -1,17 +1,34 @@
-import mysql from "mysql2/promise";
-import dotenv from "dotenv";
+const mysql = require("mysql2");
+const fs = require("fs");
+const path = require("path");
+require("dotenv").config();
 
-dotenv.config();
-
-export const pool = mysql.createPool({
-  host: process.env.DB_HOST || "localhost", // mysql의 hostname
-  user: process.env.DB_USER || "root", // user 이름
-  port: process.env.DB_PORT || 3306, // 포트 번호
-  database: process.env.DB_NAME || "ddubeok_ddubeok", // 데이터베이스 이름
-  password: process.env.DB_PASSWORD || "password", // 비밀번호
-  waitForConnections: true,
-  // Pool에 획득할 수 있는 connection이 없을 때,
-  // true면 요청을 queue에 넣고 connection을 사용할 수 있게 되면 요청을 실행하며, false이면 즉시 오류를 내보내고 다시 요청
-  connectionLimit: 10, // 몇 개의 커넥션을 가지게끔 할 것인지
-  queueLimit: 0, // getConnection에서 오류가 발생하기 전에 Pool에 대기할 요청의 개수 한도
+// DB 연결
+const con = mysql.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  multipleStatements: true
 });
+
+// schema.sql 읽기
+const sqlPath = path.join(__dirname, "schema.sql");
+const sql = fs.readFileSync(sqlPath, "utf8");
+
+// DB 초기화 함수
+function initDB() {
+  con.connect(err => {
+    if (err) throw err;
+    console.log("DB 연결 성공");
+
+    con.query(sql, err => {
+      if (err) throw err;
+      console.log("DB 초기화 완료");
+      // con.end();  // 서버 시작 후 계속 연결 유지하려면 주석
+    });
+  });
+}
+
+// 다른 파일에서 import 가능하도록 export
+module.exports = { con, initDB };

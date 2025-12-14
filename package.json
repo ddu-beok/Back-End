@@ -1,6 +1,5 @@
 {
   "name": "ddubeok-ddubeok",
-  "type": "module",
   "version": "1.0.0",
   "description": "WEBSW-PROJECT",
   "main": "index.js",
