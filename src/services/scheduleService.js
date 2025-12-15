@@ -1,5 +1,5 @@
 // src/services/scheduleService.js
-// ✅ Service는 DB 쿼리 + Trip 응답 형태 가공을 담당합니다. (content blocks 포맷도 여기서 흡수)
+// ✅ Service는 DB 쿼리 + 응답 형태 가공을 담당합니다. (content blocks 포맷도 여기서 흡수)
 const { pool } = require("../db.config");
 
 function safeJsonParse(str, fallback) {
@@ -26,70 +26,65 @@ function normalizeBlocks(blocksJsonStr) {
   return [];
 }
 
-function getTripByDduBeokId(dduBeokId) {
+/** ✅ ddu_beok 존재 체크 */
+function ensureDduBeokExists(dduBeokId) {
   return new Promise((resolve, reject) => {
-    const tripSql = `
-      SELECT id,
-             title,
-             DATE_FORMAT(start_date, '%Y-%m-%d') AS startDate,
-             DATE_FORMAT(end_date, '%Y-%m-%d') AS endDate
-      FROM ddu_beok
-      WHERE id = ?
-    `;
-
-    pool.query(tripSql, [dduBeokId], (err, tripRows) => {
+    pool.query("SELECT 1 FROM ddu_beok WHERE id = ? LIMIT 1", [dduBeokId], (err, rows) => {
       if (err) return reject(err);
-      if (!tripRows || tripRows.length === 0) return reject(new Error("NOT_FOUND_DDU_BEOK"));
-
-      const trip = {
-        id: String(tripRows[0].id),
-        title: tripRows[0].title || "",
-        startDate: tripRows[0].startDate,
-        endDate: tripRows[0].endDate,
-        items: [],
-      };
-
-      const itemsSql = `
-        SELECT s.id,
-               s.title,
-               DATE_FORMAT(
-                 DATE_ADD(DATE(d.start_date), INTERVAL s.day_num - 1 DAY),
-                 '%Y-%m-%d'
-               ) AS date,
-               TIME_FORMAT(s.start_time, '%H:%i') AS startTime,
-               TIME_FORMAT(s.end_time, '%H:%i') AS endTime,
-               s.loc_detail AS address,
-               s.latitude AS lat,
-               s.longitude AS lng,
-               s.content AS blocksJson
-        FROM schedule s
-        JOIN ddu_beok d ON d.id = s.ddu_beok_id
-        WHERE s.ddu_beok_id = ?
-        ORDER BY s.day_num ASC, s.start_time ASC, s.id ASC
-      `;
-
-      pool.query(itemsSql, [dduBeokId], (err2, itemRows) => {
-        if (err2) return reject(err2);
-
-        trip.items = (itemRows || []).map((r) => ({
-          id: String(r.id),
-          date: r.date,
-          startTime: r.startTime || null,
-          endTime: r.endTime || null,
-          title: r.title || "",
-          address: r.address || "",
-          lat: r.lat,
-          lng: r.lng,
-          blocks: normalizeBlocks(r.blocksJson),
-        }));
-
-        resolve(trip);
-      });
+      if (!rows || rows.length === 0) return reject(new Error("NOT_FOUND_DDU_BEOK"));
+      resolve();
     });
   });
 }
 
-function createScheduleAndReturnTrip({
+/** ✅ 일정 전체 조회: { dduBeokId, items } */
+function getSchedulesByDduBeokId(dduBeokId) {
+  return new Promise((resolve, reject) => {
+    ensureDduBeokExists(dduBeokId)
+      .then(() => {
+        const itemsSql = `
+          SELECT s.id,
+                 s.title,
+                 DATE_FORMAT(
+                   DATE_ADD(DATE(d.start_date), INTERVAL s.day_num - 1 DAY),
+                   '%Y-%m-%d'
+                 ) AS date,
+                 TIME_FORMAT(s.start_time, '%H:%i') AS startTime,
+                 TIME_FORMAT(s.end_time, '%H:%i') AS endTime,
+                 s.loc_detail AS address,
+                 s.latitude AS lat,
+                 s.longitude AS lng,
+                 s.content AS blocksJson
+          FROM schedule s
+          JOIN ddu_beok d ON d.id = s.ddu_beok_id
+          WHERE s.ddu_beok_id = ?
+          ORDER BY s.day_num ASC, s.start_time ASC, s.id ASC
+        `;
+
+        pool.query(itemsSql, [dduBeokId], (err2, itemRows) => {
+          if (err2) return reject(err2);
+
+          const items = (itemRows || []).map((r) => ({
+            id: String(r.id),
+            date: r.date,
+            startTime: r.startTime || null,
+            endTime: r.endTime || null,
+            title: r.title || "",
+            address: r.address || "",
+            lat: r.lat,
+            lng: r.lng,
+            blocks: normalizeBlocks(r.blocksJson),
+          }));
+
+          resolve({ dduBeokId: String(dduBeokId), items });
+        });
+      })
+      .catch(reject);
+  });
+}
+
+/** ✅ 일정 추가 후 { dduBeokId, items } 반환 */
+function createScheduleAndReturnSchedules({
   dduBeokId,
   userId,
   date,
@@ -102,11 +97,12 @@ function createScheduleAndReturnTrip({
   blocks,
 }) {
   return new Promise((resolve, reject) => {
+    // day_num 계산 + 기간 체크 (문자열로 비교 가능하도록 DATE_FORMAT 사용)
     const dayNumSql = `
       SELECT
         DATEDIFF(?, DATE(start_date)) + 1 AS day_num,
-        DATE(start_date) AS s,
-        DATE(end_date) AS e
+        DATE_FORMAT(start_date, '%Y-%m-%d') AS s,
+        DATE_FORMAT(end_date, '%Y-%m-%d') AS e
       FROM ddu_beok
       WHERE id = ?
     `;
@@ -154,36 +150,41 @@ function createScheduleAndReturnTrip({
 
       pool.query(insertSql, params, (err2) => {
         if (err2) return reject(err2);
-        getTripByDduBeokId(dduBeokId).then(resolve).catch(reject);
+        getSchedulesByDduBeokId(dduBeokId).then(resolve).catch(reject);
       });
     });
   });
 }
 
-/** ✅ 일정 삭제 후 Trip 반환 */
-function deleteScheduleAndReturnTrip({ dduBeokId, scheduleId, userId }) {
+/** ✅ 일정 삭제 후 { dduBeokId, items } 반환 */
+function deleteScheduleAndReturnSchedules({ dduBeokId, scheduleId, userId }) {
   return new Promise((resolve, reject) => {
-    const delSql = `
-      DELETE FROM schedule
-      WHERE id = ?
-        AND ddu_beok_id = ?
-        AND user_id = ?
-    `;
+    // ddu_beok 존재 체크(에러 메시지 분리)
+    ensureDduBeokExists(dduBeokId)
+      .then(() => {
+        const delSql = `
+          DELETE FROM schedule
+          WHERE id = ?
+            AND ddu_beok_id = ?
+            AND user_id = ?
+        `;
 
-    pool.query(delSql, [scheduleId, dduBeokId, userId], (err, result) => {
-      if (err) return reject(err);
+        pool.query(delSql, [scheduleId, dduBeokId, userId], (err, result) => {
+          if (err) return reject(err);
 
-      if (!result || result.affectedRows === 0) {
-        return reject(new Error("NOT_FOUND_SCHEDULE"));
-      }
+          if (!result || result.affectedRows === 0) {
+            return reject(new Error("NOT_FOUND_SCHEDULE"));
+          }
 
-      getTripByDduBeokId(dduBeokId).then(resolve).catch(reject);
-    });
+          getSchedulesByDduBeokId(dduBeokId).then(resolve).catch(reject);
+        });
+      })
+      .catch(reject);
   });
 }
 
 module.exports = {
-  getTripByDduBeokId,
-  createScheduleAndReturnTrip,
-  deleteScheduleAndReturnTrip,
+  getSchedulesByDduBeokId,
+  createScheduleAndReturnSchedules,
+  deleteScheduleAndReturnSchedules,
 };

@@ -6,25 +6,29 @@ function isValidYmd(dateStr) {
   return typeof dateStr === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
 }
 
-async function getTrip(req, res) {
+/** ✅ 일정 전체 조회 */
+async function getSchedules(req, res) {
   const dduBeokId = Number(req.params.dduBeokId);
+
   if (!dduBeokId || Number.isNaN(dduBeokId)) {
     return res.status(400).json({ message: "dduBeokId가 올바르지 않습니다." });
   }
 
   try {
-    const trip = await scheduleService.getTripByDduBeokId(dduBeokId);
-    return res.json(trip);
+    const result = await scheduleService.getSchedulesByDduBeokId(dduBeokId);
+    return res.json(result);
   } catch (err) {
     console.error(err);
 
     if (String(err.message).includes("NOT_FOUND_DDU_BEOK")) {
       return res.status(404).json({ message: "해당 ddu_beok이 없습니다." });
     }
-    return res.status(500).json({ error: "Trip 조회 중 오류 발생" });
+
+    return res.status(500).json({ error: "일정 조회 중 오류 발생" });
   }
 }
 
+/** ✅ 일정 생성 */
 async function createSchedule(req, res) {
   const userId = 1; // TODO: 인증 붙이면 req.user.id로 교체
   const dduBeokId = Number(req.params.dduBeokId);
@@ -35,6 +39,7 @@ async function createSchedule(req, res) {
 
   const { date, startTime, endTime, title, address, lat, lng, blocks } = req.body;
 
+  // ✅ 필수 검증
   if (!isValidYmd(date)) {
     return res.status(400).json({ message: "date 형식은 YYYY-MM-DD 이어야 합니다." });
   }
@@ -45,10 +50,12 @@ async function createSchedule(req, res) {
     return res.status(400).json({ message: "blocks는 1개 이상 필요합니다." });
   }
 
+  // ✅ 시간 검증(선택)
   if (startTime && endTime && String(startTime) >= String(endTime)) {
     return res.status(400).json({ message: "startTime은 endTime보다 빨라야 합니다." });
   }
 
+  // ✅ 블록당 이미지 제한(최대 5장)
   for (const b of blocks) {
     if (Array.isArray(b.images) && b.images.length > 5) {
       return res.status(400).json({ message: "블록당 이미지는 최대 5장입니다." });
@@ -56,7 +63,7 @@ async function createSchedule(req, res) {
   }
 
   try {
-    const trip = await scheduleService.createScheduleAndReturnTrip({
+    const result = await scheduleService.createScheduleAndReturnSchedules({
       dduBeokId,
       userId,
       date,
@@ -69,7 +76,7 @@ async function createSchedule(req, res) {
       blocks,
     });
 
-    return res.status(201).json(trip);
+    return res.status(201).json(result);
   } catch (err) {
     console.error(err);
 
@@ -79,6 +86,7 @@ async function createSchedule(req, res) {
     if (String(err.message).includes("DATE_OUT_OF_RANGE")) {
       return res.status(400).json({ message: "date가 여행 기간(start~end) 범위를 벗어났습니다." });
     }
+
     return res.status(500).json({ error: "일정 등록 중 오류 발생" });
   }
 }
@@ -97,14 +105,13 @@ async function deleteSchedule(req, res) {
   }
 
   try {
-    const trip = await scheduleService.deleteScheduleAndReturnTrip({
+    const result = await scheduleService.deleteScheduleAndReturnSchedules({
       dduBeokId,
       scheduleId,
       userId,
     });
 
-    // 프론트가 삭제 후 리프레시하기 편하게 "최신 Trip" 반환
-    return res.status(200).json(trip);
+    return res.status(200).json(result);
   } catch (err) {
     console.error(err);
 
@@ -114,8 +121,9 @@ async function deleteSchedule(req, res) {
     if (String(err.message).includes("NOT_FOUND_SCHEDULE")) {
       return res.status(404).json({ message: "삭제할 일정(schedule)이 없습니다." });
     }
+
     return res.status(500).json({ error: "일정 삭제 중 오류 발생" });
   }
 }
 
-module.exports = { getTrip, createSchedule, deleteSchedule };
+module.exports = { getSchedules, createSchedule, deleteSchedule };
