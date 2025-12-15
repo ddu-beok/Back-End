@@ -1,8 +1,11 @@
+// src/index.js
 const cors = require("cors");
 const dotenv = require("dotenv");
 const express = require("express");
 const { initDB } = require("./db.config");
-const userRoutes = require('./routes/userRoutes');
+
+const userRoutes = require("./routes/userRoutes");
+const scheduleRoutes = require("./routes/scheduleRoutes"); 
 
 dotenv.config();
 
@@ -21,7 +24,11 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-app.use('/api/users', userRoutes);
+// ✅ 기존 유저 API
+app.use("/api/users", userRoutes);
+
+// ✅ 일정(Trip/Item) API
+app.use("/api/ddu-beoks", scheduleRoutes);
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
