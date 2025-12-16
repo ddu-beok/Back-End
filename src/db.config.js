@@ -42,6 +42,7 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  charset: "utf8mb4", // ✅ 한글/이모지 포함 안전하게 저장
   waitForConnections: true,
   connectionLimit: 10, // 최대 연결 수
   queueLimit: 0,       // 대기열 제한 없음

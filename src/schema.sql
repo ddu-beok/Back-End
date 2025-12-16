@@ -36,7 +36,13 @@ CREATE TABLE IF NOT EXISTS schedule (
     id BIGINT NOT NULL AUTO_INCREMENT,
     ddu_beok_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
-    content VARCHAR(255),
+
+    -- ✅ 추가: 프론트 item.title 저장용
+    title VARCHAR(255),
+
+    -- ✅ 변경: blocks(JSON 문자열)를 저장하므로 LONGTEXT 권장
+    content LONGTEXT,
+
     start_time TIME,
     end_time TIME,
     loc_detail VARCHAR(255),
