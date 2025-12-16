@@ -6,6 +6,7 @@ const { initDB } = require("./db.config");
 
 const userRoutes = require("./routes/userRoutes");
 const scheduleRoutes = require("./routes/scheduleRoutes"); 
+const dduBeokRouters = require("./routes/dduBeokRouter.js")
 
 dotenv.config();
 
@@ -29,6 +30,8 @@ app.use("/api/users", userRoutes);
 
 // ✅ 일정(Trip/Item) API
 app.use("/api/ddu-beoks", scheduleRoutes);
+
+app.use("/api/ddu-beok", dduBeokRouters);
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
