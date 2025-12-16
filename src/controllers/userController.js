@@ -1,5 +1,6 @@
 const kakaoService = require("../services/kakaoService");
 const userService = require('../services/userService');
+const { getUserIdFromJWT } = require("../utils/jwtUtil");
 
 const kakaoCallback = async (req, res) => {
     const { code } = req.query; // 프론트에서 받은 authorization_code
@@ -22,7 +23,9 @@ const kakaoCallback = async (req, res) => {
 };
 
 async function getUserDduBeok(req, res) {
-    const userId = 1; //req.params.id;
+    const authHeader = req.headers.authorization;
+    const token = authHeader.split(" ")[1];
+    const userId = getUserIdFromJWT(token);
 
     try {
         const results = await userService.getUserDduBeokById(userId);
