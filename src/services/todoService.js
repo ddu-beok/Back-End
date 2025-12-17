@@ -47,7 +47,23 @@ const checkTodo = async ({ userId, todoId }) => {
     };
 };
 
+const getTodo = async ({ userId, dduBeokId, num}) => {
+    const [result] = await pool.promise().query(
+        `
+        SELECT category, content, is_checked
+        FROM todo
+        WHERE user_id = ? AND ddu_beok_id = ? AND day_num = ?
+        `,
+        [userId, dduBeokId, num]
+    );
+
+    return {
+        result
+    };
+};
+
 module.exports = {
-  createTodo,
-  checkTodo
+    createTodo,
+    checkTodo,
+    getTodo
 };

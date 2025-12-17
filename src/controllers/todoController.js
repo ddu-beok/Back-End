@@ -57,9 +57,35 @@ const checkTodo = async (req, res) => {
     }
 };
 
-// const getTodo
+const getTodo = async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({ message: 'Authorization 헤더가 없습니다.' });
+        }
+
+        const token = authHeader.split(" ")[1];
+        const userId = getUserIdFromJWT(token);
+
+        const { dduBeokId } = req.params;
+        const { num } = req.query;
+
+        const result = await todoService.getTodo({
+            userId,
+            dduBeokId,
+            num
+        });
+
+        res.status(200).json(result);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ message: "todo 조회 실패" });
+    }
+}
 
 module.exports = {
     createTodo,
-    checkTodo
+    checkTodo,
+    getTodo
 };
