@@ -9,4 +9,8 @@ router.get('/login/kakao', userController.kakaoCallback);
 // 사용자 뚜벅 조회 
 router.get('/ddu-beok', userController.getUserDduBeok);
 
+router.get('/me', userController.getMe);
+
+router.get('/footprints', userController.getUserFootprints);
+
 module.exports = router;
