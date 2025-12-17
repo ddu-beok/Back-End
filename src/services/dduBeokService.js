@@ -1,15 +1,15 @@
 const { pool } = require('../db.config');
 
 const createDdubeok = async ({
-        userId,
-        title,
-        location,
-        password,
-        startDate,
-        endDate,
-        latitude,
-        longitude,
-        imageUrl,
+    userId,
+    title,
+    location,
+    password,
+    startDate,
+    endDate,
+    latitude,
+    longitude,
+    imageUrl,
     }) => {
     const [result] = await pool.promise().query(
         `
