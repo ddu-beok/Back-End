@@ -2,22 +2,32 @@ const { pool } = require('../db.config');
 
 function getUserDduBeokById(userId) {
   return new Promise((resolve, reject) => {
-    const sql = `SELECT * FROM ddu_beok WHERE user_id = ?`;
-    
-    pool.query(sql, [userId], async (err, results) => {
+
+    const sql = `
+      SELECT *
+      FROM ddu_beok
+      WHERE user_id = ?
+         OR participant LIKE CONCAT('%', ?, '%')
+    `;
+
+    pool.query(sql, [userId, userId], async (err, results) => {
       if (err) return reject(err);
 
       const processed = [];
 
       for (const row of results) {
         let participantArr = [];
+
         if (row.participant) {
-          const participantIds = row.participant.split(',').map(id => id.trim());
+          const participantIds = row.participant.split(',');
 
           if (participantIds.length > 0) {
-            // 해당 유저들의 profile_img 조회
             const placeholders = participantIds.map(() => '?').join(',');
-            const sqlUsers = `SELECT id AS user_id, profile_img FROM user WHERE id IN (${placeholders})`;
+            const sqlUsers = `
+              SELECT id AS user_id, profile_img
+              FROM user
+              WHERE id IN (${placeholders})
+            `;
 
             participantArr = await new Promise((res, rej) => {
               pool.query(sqlUsers, participantIds, (err2, userRows) => {
@@ -33,7 +43,7 @@ function getUserDduBeokById(userId) {
           title: row.title,
           location: row.location,
           img: row.img,
-          isFavorate: row.is_favorite,
+          isFavorite: row.is_favorite,
           participant: participantArr
         });
       }
@@ -42,6 +52,7 @@ function getUserDduBeokById(userId) {
     });
   });
 }
+
 function getMeById(userId) {
   return new Promise((resolve, reject) => {
     const sql = `SELECT id, nickname, profile_img FROM user WHERE id = ? LIMIT 1`;
