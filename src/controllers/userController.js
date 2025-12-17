@@ -7,7 +7,7 @@ const kakaoCallback = async (req, res) => {
     console.log('req: ', req.query);
 
     if (!code) {
-        return res.redirect("http://localhost:3000/login/fail");
+        return res.redirect("https://ddu-beok.netlify.app/login/fail");
     }
 
     try {
@@ -15,10 +15,10 @@ const kakaoCallback = async (req, res) => {
         const jwtToken = await kakaoService.generateJWTFromCode(code);
 
         // JWT만 프론트로 전달
-        res.redirect(`http://localhost:3000/login/success?token=${jwtToken}`);
+        res.redirect(`https://ddu-beok.netlify.app/login/success?token=${jwtToken}`);
     } catch (err) {
         console.error(err);
-        res.redirect("http://localhost:3000/login/fail");
+        res.redirect("https://ddu-beok.netlify.app/login/fail");
     }
 };
 
