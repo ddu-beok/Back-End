@@ -1,5 +1,5 @@
 // src/services/scheduleService.js
-// ✅ 권한 체크(소유자/participant) 포함 버전
+// ✅ 권한 체크(소유자/participant) 포함 버전 (async/await로 안정화)
 const { pool } = require("../db.config");
 
 function safeJsonParse(str, fallback) {
@@ -22,8 +22,7 @@ function normalizeBlocks(blocksJsonStr) {
 
 /**
  * ✅ participant 파싱 강화
- * - DB가 JSON 타입이면 값이 `"2,3,6"` 처럼 따옴표 포함 문자열로 내려올 수 있음
- * - 또는 `["2","3","6"]` 같은 JSON 배열 형태일 수도 있음
+ * - `"2,3,6"` / `["2","3"]` / `2,3,6` 모두 대응
  * - 최종적으로 [2,3,6] 숫자 배열로 정규화
  */
 function parseParticipantIds(participantStr) {
@@ -34,7 +33,6 @@ function parseParticipantIds(participantStr) {
   if (typeof raw === "string") {
     const t = raw.trim();
 
-    // JSON 문자열("2,3,6") 또는 JSON 배열(["2","3","6"]) 형태 방어
     if ((t.startsWith('"') && t.endsWith('"')) || t.startsWith("[")) {
       const parsed = safeJsonParse(t, null);
 
@@ -44,13 +42,13 @@ function parseParticipantIds(participantStr) {
           .filter((n) => Number.isFinite(n) && n > 0);
       }
 
-      if (typeof parsed === "string") raw = parsed; // "2,3,6" -> 2,3,6
+      if (typeof parsed === "string") raw = parsed;
     }
   }
 
   return String(raw)
-    .replace(/\s+/g, "")   // 공백 제거
-    .replace(/^"|"$/g, "") // 양끝 따옴표 제거(혹시 남아있으면)
+    .replace(/\s+/g, "")
+    .replace(/^"|"$/g, "")
     .split(",")
     .map((v) => Number(v))
     .filter((n) => Number.isFinite(n) && n > 0);
@@ -62,83 +60,74 @@ function parseParticipantIds(participantStr) {
  * - 권한 X -> FORBIDDEN_DDU_BEOK
  * - return: { isOwner, start, end }
  */
-function ensureDduBeokAccessible(dduBeokId, userId) {
-  return new Promise((resolve, reject) => {
-    const sql = `
-      SELECT id, user_id, participant,
-             DATE_FORMAT(start_date, '%Y-%m-%d') AS s,
-             DATE_FORMAT(end_date, '%Y-%m-%d') AS e
-      FROM ddu_beok
-      WHERE id = ?
-      LIMIT 1
-    `;
+async function ensureDduBeokAccessible(dduBeokId, userId) {
+  const sql = `
+    SELECT id, user_id, participant,
+           DATE_FORMAT(start_date, '%Y-%m-%d') AS s,
+           DATE_FORMAT(end_date, '%Y-%m-%d') AS e
+    FROM ddu_beok
+    WHERE id = ?
+    LIMIT 1
+  `;
 
-    pool.query(sql, [dduBeokId], (err, rows) => {
-      if (err) return reject(err);
-      if (!rows || rows.length === 0) return reject(new Error("NOT_FOUND_DDU_BEOK"));
+  const [rows] = await pool.promise().query(sql, [dduBeokId]);
 
-      const row = rows[0];
-      const ownerId = Number(row.user_id);
-      const isOwner = ownerId === Number(userId);
+  if (!rows || rows.length === 0) throw new Error("NOT_FOUND_DDU_BEOK");
 
-      const participants = parseParticipantIds(row.participant);
-      const isParticipant = participants.includes(Number(userId));
+  const row = rows[0];
+  const ownerId = Number(row.user_id);
+  const isOwner = ownerId === Number(userId);
 
-      if (!isOwner && !isParticipant) return reject(new Error("FORBIDDEN_DDU_BEOK"));
+  const participants = parseParticipantIds(row.participant);
+  const isParticipant = participants.includes(Number(userId));
 
-      resolve({ isOwner, start: row.s || null, end: row.e || null });
-    });
-  });
+  if (!isOwner && !isParticipant) throw new Error("FORBIDDEN_DDU_BEOK");
+
+  return { isOwner, start: row.s || null, end: row.e || null };
 }
 
 /** ✅ 일정 전체 조회: { dduBeokId, items } */
-function getSchedulesByDduBeokId(dduBeokId, userId) {
-  return new Promise((resolve, reject) => {
-    ensureDduBeokAccessible(dduBeokId, userId)
-      .then(() => {
-        const itemsSql = `
-          SELECT s.id,
-                 s.title,
-                 DATE_FORMAT(
-                   DATE_ADD(DATE(d.start_date), INTERVAL s.day_num - 1 DAY),
-                   '%Y-%m-%d'
-                 ) AS date,
-                 TIME_FORMAT(s.start_time, '%H:%i') AS startTime,
-                 TIME_FORMAT(s.end_time, '%H:%i') AS endTime,
-                 s.loc_detail AS address,
-                 s.latitude AS lat,
-                 s.longitude AS lng,
-                 s.content AS blocksJson
-          FROM schedule s
-          JOIN ddu_beok d ON d.id = s.ddu_beok_id
-          WHERE s.ddu_beok_id = ?
-          ORDER BY s.day_num ASC, s.start_time ASC, s.id ASC
-        `;
+async function getSchedulesByDduBeokId(dduBeokId, userId) {
+  await ensureDduBeokAccessible(dduBeokId, userId);
 
-        pool.query(itemsSql, [dduBeokId], (err2, itemRows) => {
-          if (err2) return reject(err2);
+  const itemsSql = `
+    SELECT s.id,
+           s.title,
+           DATE_FORMAT(
+             DATE_ADD(DATE(d.start_date), INTERVAL s.day_num - 1 DAY),
+             '%Y-%m-%d'
+           ) AS date,
+           TIME_FORMAT(s.start_time, '%H:%i') AS startTime,
+           TIME_FORMAT(s.end_time, '%H:%i') AS endTime,
+           s.loc_detail AS address,
+           s.latitude AS lat,
+           s.longitude AS lng,
+           s.content AS blocksJson
+    FROM schedule s
+    JOIN ddu_beok d ON d.id = s.ddu_beok_id
+    WHERE s.ddu_beok_id = ?
+    ORDER BY s.day_num ASC, s.start_time ASC, s.id ASC
+  `;
 
-          const items = (itemRows || []).map((r) => ({
-            id: String(r.id),
-            date: r.date,
-            startTime: r.startTime || null,
-            endTime: r.endTime || null,
-            title: r.title || "",
-            address: r.address || "",
-            lat: r.lat,
-            lng: r.lng,
-            blocks: normalizeBlocks(r.blocksJson),
-          }));
+  const [itemRows] = await pool.promise().query(itemsSql, [dduBeokId]);
 
-          resolve({ dduBeokId: String(dduBeokId), items });
-        });
-      })
-      .catch(reject);
-  });
+  const items = (itemRows || []).map((r) => ({
+    id: String(r.id),
+    date: r.date,
+    startTime: r.startTime || null,
+    endTime: r.endTime || null,
+    title: r.title || "",
+    address: r.address || "",
+    lat: r.lat,
+    lng: r.lng,
+    blocks: normalizeBlocks(r.blocksJson),
+  }));
+
+  return { dduBeokId: String(dduBeokId), items };
 }
 
 /** ✅ 일정 추가 후 { dduBeokId, items } 반환 */
-function createScheduleAndReturnSchedules({
+async function createScheduleAndReturnSchedules({
   dduBeokId,
   userId,
   date,
@@ -150,103 +139,90 @@ function createScheduleAndReturnSchedules({
   lng,
   blocks,
 }) {
-  return new Promise((resolve, reject) => {
-    ensureDduBeokAccessible(dduBeokId, userId)
-      .then(({ start, end }) => {
-        // ✅ 기간 체크
-        if (start && end) {
-          if (date < start || date > end) {
-            return reject(new Error("DATE_OUT_OF_RANGE"));
-          }
-        }
+  const { start, end } = await ensureDduBeokAccessible(dduBeokId, userId);
 
-        // ✅ day_num 계산
-        const dayNumSql = `
-          SELECT DATEDIFF(?, DATE(start_date)) + 1 AS day_num
-          FROM ddu_beok
-          WHERE id = ?
-        `;
+  // ✅ 기간 체크 (YYYY-MM-DD 문자열 비교는 안전)
+  if (start && end) {
+    if (date < start || date > end) {
+      throw new Error("DATE_OUT_OF_RANGE");
+    }
+  }
 
-        pool.query(dayNumSql, [date, dduBeokId], (err, rows) => {
-          if (err) return reject(err);
-          if (!rows || rows.length === 0 || rows[0].day_num == null) {
-            return reject(new Error("NOT_FOUND_DDU_BEOK"));
-          }
+  // ✅ day_num 계산
+  const dayNumSql = `
+    SELECT DATEDIFF(?, DATE(start_date)) + 1 AS day_num
+    FROM ddu_beok
+    WHERE id = ?
+  `;
+  const [rows] = await pool.promise().query(dayNumSql, [date, dduBeokId]);
 
-          const dayNum = Number(rows[0].day_num);
+  if (!rows || rows.length === 0 || rows[0].day_num == null) {
+    throw new Error("NOT_FOUND_DDU_BEOK");
+  }
 
-          const blocksArray = Array.isArray(blocks) ? blocks : [];
-          const blocksJson = JSON.stringify(blocksArray);
+  const dayNum = Number(rows[0].day_num);
+  if (!Number.isFinite(dayNum) || dayNum <= 0) {
+    throw new Error("DATE_OUT_OF_RANGE");
+  }
 
-          const insertSql = `
-            INSERT INTO schedule
-              (ddu_beok_id, user_id, title, content,
-               start_time, end_time, loc_detail, latitude, longitude, day_num)
-            VALUES
-              (?, ?, ?, ?,
-               ?, ?, ?, ?, ?, ?)
-          `;
+  const blocksArray = Array.isArray(blocks) ? blocks : [];
+  const blocksJson = JSON.stringify(blocksArray);
 
-          const params = [
-            dduBeokId,
-            userId,
-            title,
-            blocksJson,
-            startTime,
-            endTime,
-            address,
-            lat,
-            lng,
-            dayNum,
-          ];
+  const insertSql = `
+    INSERT INTO schedule
+      (ddu_beok_id, user_id, title, content,
+       start_time, end_time, loc_detail, latitude, longitude, day_num)
+    VALUES
+      (?, ?, ?, ?,
+       ?, ?, ?, ?, ?, ?)
+  `;
 
-          pool.query(insertSql, params, (err2) => {
-            if (err2) return reject(err2);
-            getSchedulesByDduBeokId(dduBeokId, userId).then(resolve).catch(reject);
-          });
-        });
-      })
-      .catch(reject);
-  });
+  const params = [
+    dduBeokId,
+    userId,
+    title,
+    blocksJson,
+    startTime, // null 또는 "HH:mm"
+    endTime,   // null 또는 "HH:mm"
+    address,
+    lat,
+    lng,
+    dayNum,
+  ];
+
+  await pool.promise().query(insertSql, params);
+  return await getSchedulesByDduBeokId(dduBeokId, userId);
 }
 
 /** ✅ 일정 삭제 후 { dduBeokId, items } 반환 */
-function deleteScheduleAndReturnSchedules({ dduBeokId, scheduleId, userId }) {
-  return new Promise((resolve, reject) => {
-    ensureDduBeokAccessible(dduBeokId, userId)
-      .then(({ isOwner }) => {
-        // ✅ 소유자: 해당 뚜벅 일정 전체 삭제 가능(누가 만들었든)
-        // ✅ 참여자: 본인 userId가 만든 일정만 삭제 가능
-        const delSqlOwner = `
-          DELETE FROM schedule
-          WHERE id = ?
-            AND ddu_beok_id = ?
-        `;
+async function deleteScheduleAndReturnSchedules({ dduBeokId, scheduleId, userId }) {
+  const { isOwner } = await ensureDduBeokAccessible(dduBeokId, userId);
 
-        const delSqlParticipant = `
-          DELETE FROM schedule
-          WHERE id = ?
-            AND ddu_beok_id = ?
-            AND user_id = ?
-        `;
+  // ✅ 소유자: 해당 뚜벅의 일정 전체 삭제 가능(누가 만들었든)
+  // ✅ 참여자: 본인 userId가 만든 일정만 삭제 가능
+  const delSqlOwner = `
+    DELETE FROM schedule
+    WHERE id = ?
+      AND ddu_beok_id = ?
+  `;
 
-        const sql = isOwner ? delSqlOwner : delSqlParticipant;
-        const params = isOwner
-          ? [scheduleId, dduBeokId]
-          : [scheduleId, dduBeokId, userId];
+  const delSqlParticipant = `
+    DELETE FROM schedule
+    WHERE id = ?
+      AND ddu_beok_id = ?
+      AND user_id = ?
+  `;
 
-        pool.query(sql, params, (err, result) => {
-          if (err) return reject(err);
+  const sql = isOwner ? delSqlOwner : delSqlParticipant;
+  const params = isOwner ? [scheduleId, dduBeokId] : [scheduleId, dduBeokId, userId];
 
-          if (!result || result.affectedRows === 0) {
-            return reject(new Error("NOT_FOUND_SCHEDULE"));
-          }
+  const [result] = await pool.promise().query(sql, params);
 
-          getSchedulesByDduBeokId(dduBeokId, userId).then(resolve).catch(reject);
-        });
-      })
-      .catch(reject);
-  });
+  if (!result || result.affectedRows === 0) {
+    throw new Error("NOT_FOUND_SCHEDULE");
+  }
+
+  return await getSchedulesByDduBeokId(dduBeokId, userId);
 }
 
 module.exports = {

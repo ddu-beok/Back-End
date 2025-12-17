@@ -4,12 +4,20 @@
  * - S3 업로드된 파일 URL(req.files[].location)을 blocks.images에 주입
  * - ✅ payload 파싱(BOM/이중문자열/바깥따옴표 케이스) 강화
  * - ✅ schedule API는 Authorization: Bearer <JWT> 필수
+ * - ✅ time/lat/lng/blocks-id/업로드 매핑 검증 강화
  */
 const scheduleService = require("../services/scheduleService");
 const { getUserIdFromJWT } = require("../utils/jwtUtil");
 
 function isValidYmd(dateStr) {
   return typeof dateStr === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+}
+function isValidHHmm(t) {
+  return typeof t === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+}
+function hhmmToMinutes(t) {
+  const [h, m] = t.split(":").map((v) => Number(v));
+  return h * 60 + m;
 }
 
 function safeJsonParse(str, fallback) {
@@ -23,6 +31,25 @@ function safeJsonParse(str, fallback) {
 function isMultipart(req) {
   const ct = String(req.headers["content-type"] || "");
   return ct.includes("multipart/form-data");
+}
+
+function normalizeNumberOrNull(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function dedupeArray(arr) {
+  const out = [];
+  const set = new Set();
+  for (const v of arr) {
+    const key = String(v);
+    if (!set.has(key)) {
+      set.add(key);
+      out.push(v);
+    }
+  }
+  return out;
 }
 
 /** ✅ Authorization: Bearer <token> 필수 */
@@ -40,7 +67,6 @@ function requireUserId(req, res) {
     res.status(401).json({ message: "유효하지 않은 토큰입니다." });
     return null;
   }
-
   return userId;
 }
 
@@ -140,12 +166,13 @@ async function createSchedule(req, res) {
   }
 
   const date = String(body?.date ?? "").trim();
-  const startTime = body?.startTime != null ? String(body.startTime).trim() : "";
-  const endTime = body?.endTime != null ? String(body.endTime).trim() : "";
+  const startTimeRaw = body?.startTime != null ? String(body.startTime).trim() : "";
+  const endTimeRaw = body?.endTime != null ? String(body.endTime).trim() : "";
   const title = body?.title != null ? String(body.title).trim() : "";
   const address = body?.address != null ? String(body.address).trim() : "";
-  const lat = body?.lat ?? null;
-  const lng = body?.lng ?? null;
+
+  const latN = normalizeNumberOrNull(body?.lat ?? null);
+  const lngN = normalizeNumberOrNull(body?.lng ?? null);
 
   let blocksRaw = body.blocks ?? body.contents ?? [];
   if (typeof blocksRaw === "string") blocksRaw = safeJsonParse(blocksRaw, null);
@@ -155,12 +182,13 @@ async function createSchedule(req, res) {
   const blocksArray = Array.isArray(blocksRaw) ? blocksRaw : [];
 
   const blocks = blocksArray.map((b) => ({
-    id: String(b?.id ?? "").trim(),
+    id: String(b?.id ?? "").trim(), // ✅ 이미지 매핑에 사용
     icon: b?.icon ?? "",
     content: String(b?.content ?? b?.text ?? "").trim(),
     images: Array.isArray(b?.images) ? b.images : [],
   }));
 
+  // ✅ 기본 검증
   if (!isValidYmd(date)) {
     return res.status(400).json({ message: "date 형식은 YYYY-MM-DD 이어야 합니다." });
   }
@@ -170,10 +198,33 @@ async function createSchedule(req, res) {
   if (!Array.isArray(blocks) || blocks.length === 0) {
     return res.status(400).json({ message: "blocks는 1개 이상 필요합니다." });
   }
-  if (startTime && endTime && startTime >= endTime) {
+
+  // ✅ time 정규화/검증
+  const startTime = startTimeRaw ? startTimeRaw : null;
+  const endTime = endTimeRaw ? endTimeRaw : null;
+
+  if (startTime && !isValidHHmm(startTime)) {
+    return res.status(400).json({ message: "startTime 형식은 HH:mm 이어야 합니다." });
+  }
+  if (endTime && !isValidHHmm(endTime)) {
+    return res.status(400).json({ message: "endTime 형식은 HH:mm 이어야 합니다." });
+  }
+  if (startTime && endTime && hhmmToMinutes(startTime) >= hhmmToMinutes(endTime)) {
     return res.status(400).json({ message: "startTime은 endTime보다 빨라야 합니다." });
   }
 
+  // ✅ lat/lng 검증
+  if (Number.isNaN(latN) || Number.isNaN(lngN)) {
+    return res.status(400).json({ message: "lat/lng는 숫자여야 합니다." });
+  }
+  if (latN != null && (latN < -90 || latN > 90)) {
+    return res.status(400).json({ message: "lat 범위가 올바르지 않습니다. (-90~90)" });
+  }
+  if (lngN != null && (lngN < -180 || lngN > 180)) {
+    return res.status(400).json({ message: "lng 범위가 올바르지 않습니다. (-180~180)" });
+  }
+
+  // ✅ 업로드 이미지 blockId 매핑
   const imageMap = {};
   const files = Array.isArray(req.files) ? req.files : [];
 
@@ -190,11 +241,25 @@ async function createSchedule(req, res) {
     imageMap[blockId].push(url);
   }
 
+  // ✅ “업로드된 blockId”가 payload blocks.id에 실제로 존재하는지 검증 (매핑 실패 방지)
+  const payloadBlockIdSet = new Set(blocks.map((b) => String(b.id || "").trim()).filter(Boolean));
+  const uploadedBlockIds = Object.keys(imageMap);
+
+  const missing = uploadedBlockIds.filter((bid) => !payloadBlockIdSet.has(bid));
+  if (missing.length > 0) {
+    return res.status(400).json({
+      message: "업로드된 이미지의 blockId가 payload.blocks.id와 일치하지 않습니다.",
+      missingBlockIds: missing,
+      hint: '이미지 파일명은 "<blockId>__파일명.jpg" 형식이어야 합니다.',
+    });
+  }
+
   const blocksWithUrls = blocks.map((b) => {
-    const id = String(b?.id || "");
+    const id = String(b?.id || "").trim();
     const existing = Array.isArray(b?.images) ? b.images : [];
     const uploaded = Array.isArray(imageMap[id]) ? imageMap[id] : [];
-    return { ...b, images: [...existing, ...uploaded].slice(0, 5) };
+    const merged = dedupeArray([...existing, ...uploaded]);
+    return { ...b, images: merged.slice(0, 5) };
   });
 
   try {
@@ -202,12 +267,12 @@ async function createSchedule(req, res) {
       dduBeokId,
       userId,
       date,
-      startTime: startTime || null,
-      endTime: endTime || null,
+      startTime,
+      endTime,
       title,
       address,
-      lat: lat ?? null,
-      lng: lng ?? null,
+      lat: latN,
+      lng: lngN,
       blocks: blocksWithUrls,
     });
 
@@ -222,9 +287,9 @@ async function createSchedule(req, res) {
       return res.status(404).json({ message: "해당 ddu_beok이 없습니다." });
     }
     if (String(err.message).includes("DATE_OUT_OF_RANGE")) {
-      return res
-        .status(400)
-        .json({ message: "date가 여행 기간(start~end) 범위를 벗어났습니다." });
+      return res.status(400).json({
+        message: "date가 여행 기간(start~end) 범위를 벗어났습니다.",
+      });
     }
 
     return res.status(500).json({ error: "일정 등록 중 오류 발생" });
