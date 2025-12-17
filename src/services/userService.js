@@ -41,5 +41,29 @@ function getUserDduBeokById(userId) {
     });
   });
 }
+function getMeById(userId) {
+  return new Promise((resolve, reject) => {
+    const sql = `SELECT id, nickname, profile_img FROM user WHERE id = ? LIMIT 1`;
+    pool.query(sql, [userId], (err, results) => {
+      if (err) return reject(err);
+      resolve(results[0] || null);
+    });
+  });
+}
+function getUserFootprintsById(userId) {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      SELECT id, title, location, latitude, longitude
+      FROM ddu_beok
+      WHERE user_id = ?
+        AND latitude IS NOT NULL
+        AND longitude IS NOT NULL
+    `;
+    pool.query(sql, [userId], (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+}
 
-module.exports = { getUserDduBeokById };
+module.exports = { getUserDduBeokById, getMeById, getUserFootprintsById };

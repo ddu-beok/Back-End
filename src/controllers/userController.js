@@ -1,70 +1,97 @@
-/**
- * - kakaoCallback: 카카오 콜백(code) -> JWT 발급 -> 프론트 성공/실패 페이지로 redirect
- * - getUserDduBeok: Authorization: Bearer <token> 에서 userId 추출 후 조회
- */
 const kakaoService = require("../services/kakaoService");
-const userService = require("../services/userService");
+const userService = require('../services/userService');
 const { getUserIdFromJWT } = require("../utils/jwtUtil");
 
-// ✅ 요청대로 .env FRONTEND_ORIGIN 제거하고 하드코딩
-const FRONTEND_ORIGIN = "http://localhost:3000";
-
 const kakaoCallback = async (req, res) => {
-  const { code, error, error_description } = req.query;
+    const { code } = req.query; // 프론트에서 받은 authorization_code
+    console.log('req: ', req.query);
 
-  if (error) {
-    console.error("Kakao OAuth error:", error, error_description);
-    return res.redirect(`${FRONTEND_ORIGIN}/login/fail`);
-  }
+    if (!code) {
+        return res.redirect("http://localhost:3000/login/fail");
+    }
 
-  // code 없이 직접 접근하면 실패로
-  if (!code) {
-    return res.redirect(`${FRONTEND_ORIGIN}/login/fail`);
-  }
+    try {
+        // 백엔드에서 JWT만 발급
+        const jwtToken = await kakaoService.generateJWTFromCode(code);
 
-  try {
-    const jwtToken = await kakaoService.generateJWTFromCode(code);
-
-    // ✅ 토큰은 URL에 들어가므로 인코딩
-    return res.redirect(
-      `${FRONTEND_ORIGIN}/login/success?token=${encodeURIComponent(jwtToken)}`
-    );
-  } catch (err) {
-    console.error("kakaoCallback error:", err.response?.data || err.message || err);
-    return res.redirect(`${FRONTEND_ORIGIN}/login/fail`);
-  }
+        // JWT만 프론트로 전달
+        res.redirect(`http://localhost:3000/login/success?token=${jwtToken}`);
+    } catch (err) {
+        console.error(err);
+        res.redirect("http://localhost:3000/login/fail");
+    }
 };
 
 async function getUserDduBeok(req, res) {
-  const authHeader = req.headers.authorization || "";
-  const [scheme, token] = authHeader.split(" ");
+    const authHeader = req.headers.authorization;
 
-  if (scheme !== "Bearer" || !token) {
-    return res.status(401).json({
-      message: "Authorization 헤더(Bearer 토큰)가 필요합니다.",
-    });
-  }
-
-  const userId = getUserIdFromJWT(token);
-  if (!userId) {
-    return res.status(401).json({ message: "유효하지 않은 토큰입니다." });
-  }
-
-  try {
-    const results = await userService.getUserDduBeokById(userId);
-
-    if (!results || results.length === 0) {
-      return res.status(404).json({ message: "해당 유저 데이터가 없습니다." });
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ message: 'Authorization 헤더가 없습니다.' });
     }
 
-    return res.json(results);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "DB 조회 중 오류 발생" });
-  }
+    const token = authHeader.split(" ")[1];
+    const userId = getUserIdFromJWT(token);
+
+    try {
+        const results = await userService.getUserDduBeokById(userId);
+
+        if (!results || results.length === 0) {
+            return res.status(404).json({ message: '해당 유저 데이터가 없습니다.' });
+        }
+
+        res.json(results);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'DB 조회 중 오류 발생' });
+    }
+}
+
+async function getMe(req, res) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ message: 'Authorization 헤더가 없습니다.' });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const userId = getUserIdFromJWT(token);
+
+    try {
+        const result = await userService.getMeById(userId);
+
+        if (!result) {
+            return res.status(404).json({ message: '유저 없음' });
+        }
+
+        res.json(result);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'DB 조회 중 오류 발생' });
+    }
+}
+
+async function getUserFootprints(req, res) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ message: 'Authorization 헤더가 없습니다.' });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const userId = getUserIdFromJWT(token);
+
+    try {
+        const results = await userService.getUserFootprintsById(userId);
+        res.json(results);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'DB 조회 중 오류 발생' });
+    }
 }
 
 module.exports = {
-  kakaoCallback,
-  getUserDduBeok,
+    kakaoCallback,
+    getUserDduBeok,
+    getMe,
+    getUserFootprints,
 };

@@ -1,12 +1,16 @@
-const express = require("express");
-const userController = require("../controllers/userController");
+const express = require('express');
+const userController = require('../controllers/userController');
 
 const router = express.Router();
 
-// 카카오 로그인 콜백
-router.get("/login/kakao", userController.kakaoCallback);
+// 카카오 로그인 
+router.get('/login/kakao', userController.kakaoCallback);
 
-// 사용자 뚜벅 조회 (Authorization: Bearer <token>)
-router.get("/ddu-beok", userController.getUserDduBeok);
+// 사용자 뚜벅 조회 
+router.get('/ddu-beok', userController.getUserDduBeok);
+
+router.get('/me', userController.getMe);
+
+router.get('/footprints', userController.getUserFootprints);
 
 module.exports = router;
