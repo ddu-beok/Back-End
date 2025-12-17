@@ -8,5 +8,6 @@ router.post('/image', imageUploader.single("image"), dduBeokCotroller.uploadDduB
 router.post('', dduBeokCotroller.createDdubeok);
 router.post('/like/:dduBeokId', dduBeokCotroller.likeDduBeok);
 router.get('/', dduBeokCotroller.getDduBeok);
+router.post('/enter/:dduBeokId', dduBeokCotroller.enterDduBeok);
 
 module.exports = router;

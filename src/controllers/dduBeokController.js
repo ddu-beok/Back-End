@@ -17,7 +17,7 @@ const uploadDduBeokImage = async (req, res) => {
 };
 
 const createDdubeok = async (req, res) => {
-  try {
+    try {
         const authHeader = req.headers.authorization;
 
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -83,9 +83,48 @@ const getDduBeok = async (req, res) => {
     }
 };
 
+const enterDduBeok = async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({ message: 'Authorization 헤더가 없습니다.' });
+        }
+
+        const token = authHeader.split(" ")[1];
+        const userId = getUserIdFromJWT(token);
+
+        const { dduBeokId } = req.params;
+        const { password } = req.body;
+
+        const result = await dduBeokService.enterDduBeok({
+            userId, dduBeokId, password
+        })
+
+        res.status(201).json(result);
+    } catch (err) {
+        console.error(err.message);
+
+        if (err.message === "INVALID_PASSWORD") {
+            return res.status(401).json({ message: "비밀번호가 일치하지 않습니다." });
+        }
+
+        if (err.message === "ALREADY_PARTICIPATED") {
+            return res.status(409).json({ message: "이미 참여한 뚜벅입니다." });
+        }
+
+        if (err.message === "DDUBEOK_NOT_FOUND") {
+            return res.status(404).json({ message: "존재하지 않는 뚜벅입니다." });
+        }
+
+        res.status(500).json({ message: "뚜벅 참여 실패" });
+    }
+};
+
 module.exports = {
     uploadDduBeokImage,
     createDdubeok,
     likeDduBeok,
-    getDduBeok
+    getDduBeok,
+    enterDduBeok
 };
