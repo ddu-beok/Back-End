@@ -33,6 +33,7 @@ function getUserDduBeokById(userId) {
           title: row.title,
           location: row.location,
           img: row.img,
+          isFavorate: row.is_favorite,
           participant: participantArr
         });
       }
