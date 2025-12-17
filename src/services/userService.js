@@ -7,7 +7,7 @@ function getUserDduBeokById(userId) {
       SELECT *
       FROM ddu_beok
       WHERE user_id = ?
-         OR participant LIKE CONCAT('%', ?, '%')
+         OR JSON_CONTAINS(participant, CAST(? AS JSON), '$')
     `;
 
     pool.query(sql, [userId, userId], async (err, results) => {
@@ -18,24 +18,25 @@ function getUserDduBeokById(userId) {
       for (const row of results) {
         let participantArr = [];
 
-        if (row.participant) {
-          const participantIds = row.participant.split(',');
+        const participantIds = Array.isArray(row.participant)
+          ? row.participant
+          : row.participant
+            ? JSON.parse(row.participant)
+            : [];
 
-          if (participantIds.length > 0) {
-            const placeholders = participantIds.map(() => '?').join(',');
-            const sqlUsers = `
-              SELECT id AS user_id, profile_img
-              FROM user
-              WHERE id IN (${placeholders})
-            `;
+        if (participantIds.length > 0) {
+          const sqlUsers = `
+            SELECT id AS user_id, profile_img
+            FROM user
+            WHERE id IN (?)
+          `;
 
-            participantArr = await new Promise((res, rej) => {
-              pool.query(sqlUsers, participantIds, (err2, userRows) => {
-                if (err2) return rej(err2);
-                res(userRows);
-              });
+          participantArr = await new Promise((res, rej) => {
+            pool.query(sqlUsers, [participantIds], (err2, userRows) => {
+              if (err2) return rej(err2);
+              res(userRows);
             });
-          }
+          });
         }
 
         processed.push({
