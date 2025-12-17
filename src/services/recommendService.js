@@ -4,7 +4,7 @@ const { pool } = require("../db.config");
 function getTop3Weighted() {
   return new Promise((resolve, reject) => {
     const sql = `
-      SELECT id, title, img, weight
+      SELECT id, title, img, weight, latitude, longitude, description
       FROM recommend
       ORDER BY (-LOG(RAND()) / GREATEST(weight, 1))
       LIMIT 3
@@ -18,7 +18,7 @@ function getTop3Weighted() {
 
 function getRecommendations() {
   return new Promise((resolve, reject) => {
-    const sql = `SELECT id, title, img, weight FROM recommend`;
+    const sql = `SELECT id, title, img, weight, latitude, longitude, description FROM recommend`;
     pool.query(sql, (err, results) => {
       if (err) return reject(err);
       resolve(results);
