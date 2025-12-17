@@ -72,8 +72,20 @@ const likeDduBeok = async (req, res) => {
     }
 };
 
+const getDduBeok = async (req, res) => {
+    try {
+        const result = await dduBeokService.getDduBeok();
+
+        res.status(201).json(result);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "뚜벅 조회 실패" });
+    }
+};
+
 module.exports = {
-  uploadDduBeokImage,
-  createDdubeok,
-  likeDduBeok
+    uploadDduBeokImage,
+    createDdubeok,
+    likeDduBeok,
+    getDduBeok
 };
