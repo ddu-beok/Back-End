@@ -28,26 +28,26 @@ const createDdubeok = async (req, res) => {
         const userId = getUserIdFromJWT(token);
 
         const {
-        title,
-        location,
-        password,
-        startDate,
-        endDate,
-        latitude,
-        longitude,
-        imageUrl,
+            title,
+            location,
+            password,
+            startDate,
+            endDate,
+            latitude,
+            longitude,
+            imageUrl,
         } = req.body;
 
         const result = await dduBeokService.createDdubeok({
-        userId,
-        title,
-        location,
-        password,
-        startDate,
-        endDate,
-        latitude,
-        longitude,
-        imageUrl,
+            userId,
+            title,
+            location,
+            password,
+            startDate,
+            endDate,
+            latitude,
+            longitude,
+            imageUrl,
         });
 
         res.status(201).json(result);
