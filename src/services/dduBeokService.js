@@ -137,6 +137,8 @@ const getDduBeok = async () => {
             id: row.id,
             title: row.title,
             location: row.location,
+            start_date: row.start_date,
+            end_date: row.end_date,
             img: row.img,
             isFavorite: row.is_favorite,
             participant: participantArr
