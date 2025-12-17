@@ -39,6 +39,22 @@ const createDdubeok = async ({
     };
 };
 
+const likeDduBeok = async ({ dduBeokId }) => {
+    const [result] = await pool.promise().query(
+        `
+        UPDATE ddu_beok
+        SET is_favorite = 1
+        WHERE id = ?
+        `,
+        [dduBeokId]
+    );
+
+    return {
+        result
+    };
+}
+
 module.exports = {
     createDdubeok,
+    likeDduBeok
 };
