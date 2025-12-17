@@ -8,6 +8,7 @@ const scheduleRoutes = require("./routes/scheduleRoutes");
 const dduBeokRouters = require("./routes/dduBeokRouter.js");
 const recommendRoutes = require("./routes/recommendRoutes");
 const devRoutes = require("./routes/devRoutes");
+const todoRouters = require("./routes/todoRouter.js")
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.use("/api/ddu-beoks", scheduleRoutes);
 // ✅ 뚜벅(개인 관련) API (예: footprints, me 등)
 app.use("/api/ddu-beok", dduBeokRouters);
 
+app.use("/api/to-do", todoRouters);
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
