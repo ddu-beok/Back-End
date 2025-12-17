@@ -1,13 +1,18 @@
 const express = require('express');
 const { imageUploader } = require("../middlewares/s3upload.js");
-const { uploadDduBeokImage } = require('../controllers/dduBeokController.js');
+const dduBeokCotroller = require('../controllers/dduBeokController');
 
 const router = express.Router();
 
 router.post(
-    '/:id/image', 
+    '/image', 
     imageUploader.single("image"),
-    uploadDduBeokImage
+    dduBeokCotroller.uploadDduBeokImage
 );
+
+router.post(
+    '',
+    dduBeokCotroller.createDdubeok
+)
 
 module.exports = router;
