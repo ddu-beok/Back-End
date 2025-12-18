@@ -15,7 +15,7 @@ const createTodo = async (req, res) => {
         const { dduBeokId } = req.params;
         const { num, category } = req.query;
 
-        const content = req.body;
+        const {content} = req.body;
 
         const result = await todoService.createTodo({
             userId,
