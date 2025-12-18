@@ -99,14 +99,16 @@ const enterDduBeok = async ({ userId, dduBeokId, password }) => {
     };
 }
 
-const getDduBeok = async () => {
+const getDduBeok = async (userId) => {
     const [rows] = await pool.promise().query(
         `
         SELECT *
         FROM ddu_beok
+        WHERE user_id != ?
         ORDER BY created_at DESC
         LIMIT 16
-        `
+        `,
+        [userId]
     );
 
     const result = [];
